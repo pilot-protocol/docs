@@ -64,7 +64,7 @@ Run a regular daemon on conventional infra (VM, k8s pod, Fly.io, etc.) with full
 
 **Pros:**
 - Worker becomes a thin client; nothing about its identity is special-cased on the wire (it inherits the bridge's identity, or has its own which the bridge proxies for).
-- We can ship in days, not months — the bridge is just an HTTP wrapper around `driver.Driver`.
+- Shippable in days, not months — the bridge is just an HTTP wrapper around `driver.Driver`.
 - TLS termination at the bridge; auth via a per-Worker bearer token.
 
 **Cons:**
@@ -92,7 +92,7 @@ Build a pure-TypeScript implementation of the Pilot wire protocol (handshake/PIL
 - Long-term answer: the relay can later be replaced by direct UDP if Workers ever gains it.
 
 **Cons:**
-- Substantial new TS implementation — the Go protocol code is ~10k LOC, the subset we'd port is ~2–3k LOC (envelope + handshake + replay-window + key-exchange + ECDH/AEAD via WebCrypto).
+- Substantial new TS implementation — the Go protocol code is ~10k LOC, the subset to port is ~2–3k LOC (envelope + handshake + replay-window + key-exchange + ECDH/AEAD via WebCrypto).
 - Have to keep the TS implementation in sync with future Go changes (the existing FFI approach has the Go code as single source of truth).
 - WebSocket → UDP mapping has its own edge cases (frame ordering, MTU, reconnects, NAT-keepalive equivalent).
 - Worker CPU budget (typical 50–100 ms per request, or up to 5 min on "unbound") needs careful pacing for handshakes + retransmits.
@@ -133,9 +133,9 @@ The TypeScript side owns sockets, timers, retx loops, and feeds bytes into the W
 |---|---|---|
 | Worker bundle, gzipped | 3 MB free / 10 MB paid | A standard Go WASM is ~10 MB raw, ~3 MB gzipped — **right at the free-tier ceiling, fits paid** |
 | Worker bundle, uncompressed | 64 MB | trivially fits |
-| WASI support | "experimental, only some syscalls" | irrelevant — we'd use the host-import bridge, not WASI |
+| WASI support | "experimental, only some syscalls" | irrelevant — the host-import bridge is used, not WASI |
 | Go→WASM target | `GOOS=js GOARCH=wasm` (browser-shim) or `GOOS=wasip1 GOARCH=wasm` | use `wasm_exec.js`-style shim with custom host imports |
-| TinyGo size | ~200–500 KB for our subset | better fit, *but* TinyGo's incomplete support for goroutines / channels / reflect would force us to refactor away those constructs in the pilot packages we compile |
+| TinyGo size | ~200–500 KB for the relevant subset | better fit, *but* TinyGo's incomplete support for goroutines / channels / reflect would force a refactor away from those constructs in the compiled pilot packages |
 
 **What CAN be compiled to WASM:**
 - `internal/crypto` (Ed25519 sign/verify, X25519 derive)
@@ -160,8 +160,8 @@ The TypeScript side owns sockets, timers, retx loops, and feeds bytes into the W
 **Cons:**
 - Two languages for one library — debugging spans both.
 - Goroutine→TS event-loop bridging is non-trivial. The WASM module must be designed so all its "callbacks" surface as deterministic return values rather than spawning goroutines.
-- Standard Go's WASM runtime is ~3 MB gzipped — right at the free-tier ceiling. TinyGo would solve that but cuts off goroutines, which the asymmetric-recovery code relies on (background retx). We'd need to refactor those into "step functions" the TS driver calls each tick.
-- Need a custom `wasm_exec.js` shim that imports Workers' `connect()` / `crypto.subtle` / `setTimeout` into the wasm host. Cloudflare's WASI is experimental and lacks sockets, so we can't lean on it.
+- Standard Go's WASM runtime is ~3 MB gzipped — right at the free-tier ceiling. TinyGo would solve that but cuts off goroutines, which the asymmetric-recovery code relies on (background retx). Those would need to be refactored into "step functions" the TS driver calls each tick.
+- Need a custom `wasm_exec.js` shim that imports Workers' `connect()` / `crypto.subtle` / `setTimeout` into the wasm host. Cloudflare's WASI is experimental and lacks sockets, so it cannot be relied on.
 
 **Effort estimate:** ~4–6 weeks. Faster than Option B (no protocol re-implementation), slower than Option A (still need the wasm host shim + a redesigned step-function-friendly protocol surface in the Go code).
 

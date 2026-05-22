@@ -58,7 +58,7 @@ The beacon is the universal hub. UDP peers don't know whether a remote is on UDP
 
 ### Pilot root CA
 
-- We mint our own root CA keypair (offline, e.g. on a Yubikey).
+- A dedicated root CA keypair is minted offline (e.g. on a Yubikey).
 - The root CA's PEM-encoded certificate is **embedded in `cmd/daemon` via `//go:embed`** so every daemon binary ships with the trust anchor pre-pinned.
 - The CA signs leaf certs for each beacon hostname (`beacon-us.pilotprotocol.network`, `beacon-eu.…`, etc.).
 - Leaf certs rotate via standard `tls.Config.GetCertificate`. Root rotation is a multi-release event handled by shipping the new root in a daemon update alongside the old one (overlap window).
@@ -108,7 +108,7 @@ The beacon is the universal hub. UDP peers don't know whether a remote is on UDP
 
 ### Transport interface
 
-Today `pkg/daemon/udpio.Socket` owns the UDP FD and exposes `Send(frame []byte, dst *net.UDPAddr) error` and `Recv() (frame []byte, src *net.UDPAddr, err error)`. We extract that contract into a `daemonio.Transport` interface:
+Today `pkg/daemon/udpio.Socket` owns the UDP FD and exposes `Send(frame []byte, dst *net.UDPAddr) error` and `Recv() (frame []byte, src *net.UDPAddr, err error)`. That contract is extracted into a `daemonio.Transport` interface:
 
 ```go
 type Transport interface {
@@ -232,7 +232,7 @@ On the daemon:
 
 Public WSS endpoint can be hit by anyone. Mitigations:
 - Per-source-IP rate-limit on upgrade attempts (above).
-- nginx in front lets us deploy fail2ban / rate-limit modules at the edge.
+- nginx in front allows deploying fail2ban / rate-limit modules at the edge.
 - Auth challenge requires the attacker to have a valid Pilot identity already registered — bots can't open holding-pattern WSS connections cheaply.
 
 ## Rollout — what shipped
@@ -295,11 +295,11 @@ All phases collapsed into a single deploy on 2026-05-18. Production at `pilot-re
 4. **WS subprotocol negotiation.** **Shipped:** `Sec-WebSocket-Protocol: pilot.v1` set on both sides.
 5. **Multi-beacon WSS connections.** **Deferred** — single conn per daemon for v1; multi-beacon redundancy is a future improvement.
 
-## What we're NOT building
+## Out of scope
 
-- Centralized HTTPS REST gateway. That'd be a separate service (Phase 8+) that proxies HTTPS REST → Pilot WSS. Easy to add later once compat mode is solid; doesn't belong in v1 of compat mode itself.
+- Centralized HTTPS REST gateway. That would be a separate service (Phase 8+) proxying HTTPS REST → Pilot WSS. Easy to add later once compat mode is solid; does not belong in v1 of compat mode itself.
 - HTTP/3 / QUIC. The whole point of compat mode is to use TCP/443 which firewalls don't block. QUIC is UDP and would defeat the purpose.
-- WebRTC. We considered it — the data-channel ICE machinery would give us NAT traversal for free — but WebRTC requires a signaling server *and* still uses UDP for the data plane. Doesn't help our problem.
+- WebRTC. Considered — the data-channel ICE machinery would provide NAT traversal for free — but WebRTC requires a signaling server *and* still uses UDP for the data plane. Does not address the underlying constraint.
 
 ## Companion docs to update
 

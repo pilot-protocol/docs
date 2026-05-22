@@ -2,7 +2,7 @@
 
 **Goal:** every time an openclaw LLM run starts a new turn, the pilot directive is in front of the model. No exceptions, no "fell out of context after compaction", no "only loaded if the user opens HEARTBEAT.md".
 
-**Status:** the daemon currently writes content to `HEARTBEAT.md` + `CLAW.md`, but neither is on the per-prompt path. We have to move to a real per-prompt surface.
+**Status:** the daemon currently writes content to `HEARTBEAT.md` + `CLAW.md`, but neither is on the per-prompt path. The daemon must move to a real per-prompt surface.
 
 ## The actual openclaw prompt-build pipeline
 
@@ -25,7 +25,7 @@ composeSystemPromptWithHookContext(
 fed to the model as the system message
 ```
 
-Critical detail (verified at `attempt.ts:1203-1216`): **all four returned fields are joined across multiple plugins via `joinPresentTextSegments` — plugins compose, they don't overwrite.** That means if the user has their own plugins that contribute to the system context, ours can add to it cleanly.
+Critical detail (verified at `attempt.ts:1203-1216`): **all four returned fields are joined across multiple plugins via `joinPresentTextSegments` — plugins compose, they don't overwrite.** That means if the user has their own plugins that contribute to the system context, the pilot plugin can add to it cleanly.
 
 The hook runs **every single turn**. There is no "first message only" gating at this layer. Compaction-survival, fresh-resume, mid-session — irrelevant. If the plugin is loaded, the hook fires.
 
@@ -50,7 +50,7 @@ const hook: PluginHookRegistration<"before_prompt_build"> = {
 - Composes with user plugins (`joinPresentTextSegments` does the right thing)
 - Doesn't touch the user's `openclaw.json` — clean operational footprint
 - Failure-isolated: `runBeforePromptBuild` wraps in `try/catch` and warns if a hook throws, so a bad pilot version can never break the user's openclaw
-- Already part of openclaw's first-class plugin API; survives openclaw upgrades unless they break the hook contract (which would break many plugins, not just ours)
+- Already part of openclaw's first-class plugin API; survives openclaw upgrades unless they break the hook contract (which would break many plugins, not just the pilot one)
 
 **What needs to ship:**
 - A small openclaw plugin package — `@pilotprotocol/openclaw-plugin` on npm — registering the hook
@@ -75,13 +75,13 @@ const hook: PluginHookRegistration<"before_prompt_build"> = {
 **Why it's second choice:**
 - Conflicts with user-set `systemPrompt`; needs the `_pilotManaged` sentinel + prepend-with-divider merge logic from the previous spec
 - Edits a config file the user owns — risk of user reverting or the merge logic having bugs
-- Only fires the `systemPrompt` field, not the richer `prependSystemContext` (which lets us coexist with user plugins)
+- Only fires the `systemPrompt` field, not the richer `prependSystemContext` (which permits coexistence with user plugins)
 
-**When to use:** as the path for users who haven't installed our plugin yet, or whose openclaw version is too old to support `before_prompt_build` hooks.
+**When to use:** as the path for users who haven't installed the pilot plugin yet, or whose openclaw version is too old to support `before_prompt_build` hooks.
 
 ### (3) `agents.<id>.systemPrompt` per-agent override ★ SCOPE-SPECIFIC
 
-If a user has multiple openclaw agents and we want per-agent control, the schema (`src/config/zod-schema.providers-core.ts`) supports `systemPrompt` at the agent level. Same mechanism, narrower scope. Useful for a future "pilot-only" agent.
+For per-agent control when a user has multiple openclaw agents, the schema (`src/config/zod-schema.providers-core.ts`) supports `systemPrompt` at the agent level. Same mechanism, narrower scope. Useful for a future "pilot-only" agent.
 
 ## Why HEARTBEAT.md doesn't cut it
 
@@ -99,7 +99,7 @@ The current state — `HEARTBEAT.md` carries the full directive — only reaches
 | **hermes** | Not installed locally; manifest writes to `~/.hermes/SOUL.md` (loaded as `selfHeartbeat`-equivalent) | n/a — would need user install | Hook surface unverified — if/when a user installs hermes, investigate before committing |
 | **openhands** | Not installed locally; manifest uses `selfHeartbeat: true` flag — implies openhands has its own pulling-in mechanism via `microagents/` | n/a — needs install | Pull-based; per-prompt likely handled by openhands itself once microagent exists |
 
-The pattern across the four "Claude-like" tools (Claude Code / openclaw / picoclaw / hermes) is convergent: each exposes a *pre-LLM-call hook* that takes content and prepends it to the system or user context. The pilot fix is the same shape every time — register a hook, return our text — only the wire format differs per tool.
+The pattern across the four "Claude-like" tools (Claude Code / openclaw / picoclaw / hermes) is convergent: each exposes a *pre-LLM-call hook* that takes content and prepends it to the system or user context. The pilot fix is the same shape every time — register a hook, return the pilot text — only the wire format differs per tool.
 
 ## Why "a while ago this was the case" — the regression
 
@@ -109,7 +109,7 @@ The user has mentioned this was working previously. Likely cause: an earlier ope
 
 2. **Openclaw's `systemPromptWhen` default may have changed** at some point from `"always"` to `"first"`. If users had pilot text in `systemPrompt` and openclaw used to send it every turn, the directive used to land. Today's default = `"first"` means it only lands on turn 1.
 
-Either way, the daemon's current behavior (write to HEARTBEAT.md + leave systemPromptWhen alone) is *insufficient* on current openclaw. We need to actively manage one of the per-prompt surfaces.
+Either way, the daemon's current behavior (write to HEARTBEAT.md + leave systemPromptWhen alone) is *insufficient* on current openclaw. The daemon must actively manage one of the per-prompt surfaces.
 
 ## Recommended path forward (openclaw-first)
 
@@ -138,12 +138,12 @@ Phase 1 is the unblock. Phase 2 is the durable answer. Phase 3 generalizes.
 
 ## Open questions to resolve before implementation
 
-1. **`heartbeats/openclaw.md` reuse**: should we trim the existing 104-line heartbeat for system-prompt-on-every-turn, or build a separate, tighter template? My recommendation: separate `heartbeats/openclaw-system-prompt.md` capped at ~600 tokens, since this rides on every turn's context budget.
+1. **`heartbeats/openclaw.md` reuse**: should the existing 104-line heartbeat be trimmed for system-prompt-on-every-turn, or should a separate, tighter template be built? Recommendation: separate `heartbeats/openclaw-system-prompt.md` capped at ~600 tokens, since this rides on every turn's context budget.
 2. **Daemon→openclaw bridge for plugin install**: does the daemon need access to `openclaw plugins install ...`, or does it write directly to `~/.openclaw/plugins/installs.json`? The latter is fragile (file format owned by openclaw); the former requires shelling out. Likely answer: shell out to `openclaw plugins install @pilotprotocol/openclaw-plugin` and treat openclaw-binary-not-on-PATH as a soft-fail.
-3. **Versioning**: when openclaw bumps its plugin contract (the `hostContractVersion` we saw at `2026.5.7` in `installs.json`), do we need to re-publish our plugin? Yes — but the plugin can declare a compat range.
+3. **Versioning**: when openclaw bumps its plugin contract (the `hostContractVersion` observed at `2026.5.7` in `installs.json`), does the pilot plugin need to be re-published? Yes — but the plugin can declare a compat range.
 4. **Disable for power users**: same opt-out machinery as the config mutation spec — env var + sentinel + CLI command.
 
-## What I'll commit on this branch if you say go
+## Implementation plan
 
 - `docs/ANALYSIS-per-prompt-injection.md` (this file)
 - Updates to `docs/SPEC-skillinject-openclaw-per-prompt.md` to point at this analysis for the "why plugin vs config" decision

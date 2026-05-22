@@ -8,7 +8,7 @@
 
 **The Pilot CA is NOT yet in production use.** The compat-mode WSS endpoint at `beacon.pilotprotocol.network` currently uses a **Let's Encrypt** certificate, terminated by nginx on the rendezvous host. The daemon's `-tls-trust` default is `system`, which verifies against the OS trust store.
 
-This runbook describes the future-hardening path: when we mint the production Pilot root, embed it in client binaries, and flip `-tls-trust=pinned` as the default, attacks that compromise a public CA can no longer MITM compat daemons. Until that release ships, the Pilot CA tooling below is rehearsal-only.
+This runbook describes the future-hardening path: once the production Pilot root is minted, embedded in client binaries, and `-tls-trust=pinned` becomes the default, attacks that compromise a public CA can no longer MITM compat daemons. Until that release ships, the Pilot CA tooling below is rehearsal-only.
 
 ## The trust model in one paragraph
 
@@ -94,7 +94,7 @@ Leaf certs expire after 90 days. Re-issue at day 75 so there's a 15-day overlap 
 
 Daemons don't notice — TLS sessions in flight stay valid; new connections use the new cert.
 
-Automation candidate: drive this from a periodic cron on the custody host, since the root key has to be online briefly. Out of scope for v1 — manual ops is fine while we have one or two beacons.
+Automation candidate: drive this from a periodic cron on the custody host, since the root key has to be online briefly. Out of scope for v1 — manual ops is fine while only one or two beacons exist.
 
 ## Phase 5 — Root rotation (every 5-10 years, or after compromise)
 
@@ -127,5 +127,5 @@ For a compromise-driven rotation, compress the window aggressively — flip to t
 ## What the tool deliberately does NOT do
 
 - No automatic OCSP / CRL stapling. Compat mode is a small, controlled PKI — short-lived leaves + fast embed rotation are simpler than CRL distribution.
-- No ACME. ACME requires DNS or HTTP control of the validated domain, which exposes a public DNS/HTTP attack surface we don't otherwise need. Manual `pilot-ca issue-beacon` is the right granularity until we have hundreds of beacons.
+- No ACME. ACME requires DNS or HTTP control of the validated domain, which exposes a public DNS/HTTP attack surface the deployment otherwise does not need. Manual `pilot-ca issue-beacon` is the right granularity until the fleet reaches hundreds of beacons.
 - No HSM integration in the binary. The operator's custody is whatever they choose (Yubikey via OpenSSL engine, GPG smartcard, air-gapped Linux). `pilot-ca init-root` writes a software key; the operator is responsible for moving it.

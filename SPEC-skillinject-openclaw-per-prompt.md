@@ -6,7 +6,7 @@
 
 ## Why this exists
 
-Today, on first install of pilot-daemon, openclaw users do not get pilot guidance on every prompt. We inject:
+Today, on first install of pilot-daemon, openclaw users do not get pilot guidance on every prompt. The daemon injects:
 
 - `~/.openclaw/skills/pilotctl/SKILL.md` — full skill content, but a *skill file* the agent loads on demand
 - `~/.openclaw/workspace/HEARTBEAT.md` — full heartbeat content, but `HEARTBEAT.md` is loaded periodically (the openclaw heartbeat lifecycle), **not** before every prompt
@@ -22,7 +22,7 @@ systemPromptWhen?: "first" | "always" | "never";   // default "first"
 systemPrompt?: string;
 ```
 
-When `systemPromptWhen = "always"`, openclaw prepends `systemPrompt` to the system context at every prompt build (`src/agents/cli-runner/helpers.ts`). That is the lever we want pilot-daemon to manage.
+When `systemPromptWhen = "always"`, openclaw prepends `systemPrompt` to the system context at every prompt build (`src/agents/cli-runner/helpers.ts`). That is the lever pilot-daemon manages.
 
 ## The injection target
 
@@ -70,9 +70,9 @@ Add a `configMutation` field to a tool's entry in `inject-manifest.json` (consum
 - `jsonPath` — dotted path in the target JSON. Created if absent (parent objects materialized as `{}`).
 - `fromTemplate` *or* `value` — content source. `fromTemplate` resolves against the pilot-skills repo same as `heartbeatTemplate`. `value` is a literal.
 - `merge` — conflict-resolution mode:
-  - `set-if-absent-or-managed`: write iff the field is unset or last-managed-by-us (`agents.defaults._pilotManaged.paths` lists it). Used for `systemPromptWhen`.
-  - `prepend-with-divider`: read the user's existing value; prepend ours with a `\n\n---\n\n<!-- pilot:managed -->\n` divider; remember the byte range we own via `_pilotManaged`. Used for `systemPrompt`.
-  - `overwrite-managed`: rewrite only if the existing content equals our last write (hash match). Used for sentinel maintenance.
+  - `set-if-absent-or-managed`: write iff the field is unset or last-managed-by-pilot (`agents.defaults._pilotManaged.paths` lists it). Used for `systemPromptWhen`.
+  - `prepend-with-divider`: read the user's existing value; prepend the pilot directive with a `\n\n---\n\n<!-- pilot:managed -->\n` divider; remember the pilot-owned byte range via `_pilotManaged`. Used for `systemPrompt`.
+  - `overwrite-managed`: rewrite only if the existing content equals the last pilot-written value (hash match). Used for sentinel maintenance.
 
 ## Idempotency sentinel
 
@@ -82,11 +82,11 @@ Because JSON has no comments, the daemon writes a side-channel sentinel inside t
 {
   "agents": {
     "defaults": {
-      "systemPrompt": "<our prepended directive>\n\n---\n\n<user's original content if any>",
+      "systemPrompt": "<pilot prepended directive>\n\n---\n\n<user's original content if any>",
       "systemPromptWhen": "always",
       "_pilotManaged": {
         "version": 1,
-        "hash": "<sha256 of our injected portion>",
+        "hash": "<sha256 of the pilot-injected portion>",
         "writtenAt": "2026-05-12T17:00:00Z",
         "paths": ["agents.defaults.systemPrompt", "agents.defaults.systemPromptWhen"],
         "directiveTemplate": "heartbeats/openclaw-system-prompt.md@<commit-sha>"
@@ -101,8 +101,8 @@ Sentinel rules:
 - `hash` is the SHA-256 of *the bytes pilot owns* inside each managed field (e.g. the prepended portion of `systemPrompt`, not the full field).
 - On each reconcile tick, the daemon:
   1. Reads `openclaw.json`
-  2. For each managed field, checks: is the current value identical to `hash` + the suffix we recorded? If yes, no-op. If no, the user has edited — fall through to (3).
-  3. For `prepend-with-divider`: re-prepend our latest directive *above the user's current text below the divider*. Hash is recomputed.
+  2. For each managed field, checks: is the current value identical to `hash` + the recorded suffix? If yes, no-op. If no, the user has edited — fall through to (3).
+  3. For `prepend-with-divider`: re-prepend the latest pilot directive *above the user's current text below the divider*. Hash is recomputed.
   4. For `set-if-absent-or-managed`: if the user has changed `systemPromptWhen` away from `"always"`, **respect their choice** — don't rewrite. Set `_pilotManaged.disabled = true` so subsequent ticks skip until manually re-enabled.
 
 ## User opt-out
@@ -130,10 +130,10 @@ Same loop as today (`internal/skillinject/reconcile.go`'s 15-min ticker + on-sta
 | State | Trigger | Action |
 |---|---|---|
 | `target-missing` | `openclaw.json` doesn't exist | skip — nothing to mutate (no `next_action`) |
-| `unmanaged-and-empty` | field absent AND no `_pilotManaged` block | write our value, create `_pilotManaged` |
+| `unmanaged-and-empty` | field absent AND no `_pilotManaged` block | write the pilot value, create `_pilotManaged` |
 | `unmanaged-and-present` | field has user content, no `_pilotManaged` | apply `prepend-with-divider` for `systemPrompt`; `set-if-absent-or-managed` no-ops for `systemPromptWhen` |
 | `managed-and-identical` | hash matches | no-op |
-| `managed-and-drifted` | hash doesn't match (we wrote, user edited) | re-prepend; recompute hash |
+| `managed-and-drifted` | hash doesn't match (pilot wrote, user edited) | re-prepend; recompute hash |
 | `user-opted-out` | `_pilotManaged.disabled = true` | no-op |
 
 All transitions surface via `pilotctl skills` so the user can see what state each tool is in.
@@ -157,16 +157,16 @@ Today's output gets a third row per tool when `configMutation` exists:
 ## Test obligations
 
 1. **Unit (`internal/skillinject`)**: each state-transition row above gets a test that constructs the named state, runs a reconcile tick, asserts the resulting `openclaw.json` byte-for-byte.
-2. **Idempotency**: running `reconcile()` twice in a row must produce a byte-identical file. (We had the same invariant for the markdown writes — same standard here.)
-3. **User-edit preservation**: if the user appends content below the divider, the next reconcile must preserve their content verbatim (only our prepended portion rewrites).
+2. **Idempotency**: running `reconcile()` twice in a row must produce a byte-identical file. (The markdown writes already enforce the same invariant — same standard here.)
+3. **User-edit preservation**: if the user appends content below the divider, the next reconcile must preserve their content verbatim (only the pilot-prepended portion rewrites).
 4. **Opt-out respect**: `_pilotManaged.disabled = true` + a manual edit to `systemPromptWhen = "never"` must remain unchanged across N reconcile passes.
 5. **Migration**: when the daemon updates `directiveTemplate` (new pilot-skills release), the prepended content rewrites; the user's portion below the divider stays.
 
 ## What's NOT in this spec
 
 - **Claude Code analog** (`UserPromptSubmit` hook in `~/.claude/settings.json`). Out of scope — Claude Code's hook system is different enough to warrant its own spec, and the CLAUDE.md heartbeat already gives steady-state coverage there.
-- **picoclaw/hermes/openhands config mutation**. We'd extend the manifest the same way once those tools' equivalents are identified.
-- **Per-session vs per-prompt**: openclaw's `"always"` mode runs on *prompt build*, which is per-message. We rely on that being the right granularity; no further filtering.
+- **picoclaw/hermes/openhands config mutation**. The manifest would be extended the same way once those tools' equivalents are identified.
+- **Per-session vs per-prompt**: openclaw's `"always"` mode runs on *prompt build*, which is per-message. The spec relies on that being the right granularity; no further filtering.
 
 ## Migration plan from current state
 
