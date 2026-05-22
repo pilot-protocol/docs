@@ -1,5 +1,8 @@
 # docs
 
+[![ci](https://github.com/pilot-protocol/docs/actions/workflows/ci.yml/badge.svg)](https://github.com/pilot-protocol/docs/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 Pilot Protocol design documents — the source of truth for what the
 protocol does, why it does it that way, and how to operate it.
 
@@ -35,3 +38,7 @@ The `ietf/` drafts use `kramdown-rfc` via the Makefile there.
 ```bash
 cd ietf && make
 ```
+
+## License
+
+AGPL-3.0-or-later. See [LICENSE](LICENSE).
