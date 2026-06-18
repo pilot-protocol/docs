@@ -1,5 +1,22 @@
 # Pilot Protocol Wire Specification v0.5
 
+> **Specification version:** v0.5  
+> **Protocol version (header):** `1` (4-bit field, see §3.2)
+
+## Version Compatibility
+
+| SPEC Version | Protocol version | First Pilot Protocol Release | Status |
+|---|---|---|---|
+| v0.5 | 1 | v1.10.0 | ✅ Active (current) |
+| v0.4 | 1 | v1.7.0 | ⏳ Historical |
+| v0.3 | 1 | v1.5.0 | ⏳ Historical |
+| v0.2 | 1 | v1.4.0 | ⏳ Historical |
+| v0.1 | 1 | v1.0.0 | ⏳ Historical |
+
+> **Note:** The **SPEC version** tracks the wire specification document. The 4-bit **Protocol version** field in the packet header (§3.2) identifies the wire format itself and has remained `1` across all v0.x spec revisions — the wire format is backward-compatible within the same protocol version number. A future spec revision that changes the wire format will increment this field.
+
+---
+
 ## 1. Addressing
 
 ### 1.1 Virtual Address Format
@@ -405,6 +422,22 @@ Byte  4-7:  0x00000001   (sender node ID=1)
 Byte  8-19: [12-byte nonce]
 Byte 20+:   [ciphertext + 16-byte GCM tag]
 ```
+
+### 7.5 Golden Test Corpus
+
+The wire examples above are illustrative. The authoritative byte-level wire format reference is the **golden test corpus** maintained at [`testdata/wire/`](https://github.com/TeoSlayer/pilotprotocol/tree/main/testdata/wire) in the implementation repository.
+
+This corpus contains byte-for-byte snapshots of every Pilot Protocol wire frame across layers L1, L4, L5, L6, and L7, including packet headers, relay messages, key exchange frames, encrypted payloads, and SACK acknowledgements.
+
+Each `.bin` file is parsed by the live production decoders, re-marshalled, and asserted byte-identical by [`TestWireFormatGolden`](https://github.com/TeoSlayer/pilotprotocol/blob/main/tests/zz_wire_golden_test.go). Any wire-format regression — a field reorder, an extra padding byte, a checksum tweak — fails the test and names the offending frame.
+
+**Regenerating the corpus** is a wire-format change and requires explicit version-bump approval. The generator lives at `cmd/wire-gen/main.go` behind the `wirecorpus` build tag:
+
+```
+go run -tags=wirecorpus ./cmd/wire-gen
+```
+
+See the [`testdata/wire/README.md`](https://github.com/TeoSlayer/pilotprotocol/blob/main/testdata/wire/README.md) for the full frame inventory and regeneration instructions.
 
 ---
 
