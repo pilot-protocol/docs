@@ -70,6 +70,21 @@ Socket address includes a port: `1:0001.F291.0004:1000`
 
 ## 3. Packet Format
 
+All Pilot Protocol wire-format frames are encapsulated in a tunnel envelope
+identified by a 4-byte magic byte prefix. Four frame types are defined:
+
+| Magic                   | Frame Type                           |
+|-------------------------|--------------------------------------|
+| `PILT` (0x50494C54)    | Unencrypted tunnel frame (plaintext) |
+| `PILS` (0x50494C53)    | AES-256-GCM encrypted tunnel frame   |
+| `PILK` (0x50494C4B)    | X25519 key exchange frame            |
+| `PILA` (0x50494C41)    | Ed25519 + X25519 authenticated key exchange |
+
+The frame types are detailed in §4 below. This section (§3) describes the
+inner 34-byte header shared by PILT (plaintext) frames. Encrypted (PILS),
+key-exchange (PILK), and authenticated (PILA) frames use different header
+layouts documented in §4.
+
 ### 3.1 Header Layout (34 bytes)
 
 ```
