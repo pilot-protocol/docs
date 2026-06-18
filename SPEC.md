@@ -1,5 +1,22 @@
 # Pilot Protocol Wire Specification v0.5
 
+> **Specification version:** v0.5  
+> **Protocol version (header):** `1` (4-bit field, see §3.2)
+
+## Version Compatibility
+
+| SPEC Version | Protocol version | First Pilot Protocol Release | Status |
+|---|---|---|---|
+| v0.5 | 1 | v1.10.0 | ✅ Active (current) |
+| v0.4 | 1 | v1.7.0 | ⏳ Historical |
+| v0.3 | 1 | v1.5.0 | ⏳ Historical |
+| v0.2 | 1 | v1.4.0 | ⏳ Historical |
+| v0.1 | 1 | v1.0.0 | ⏳ Historical |
+
+> **Note:** The **SPEC version** tracks the wire specification document. The 4-bit **Protocol version** field in the packet header (§3.2) identifies the wire format itself and has remained `1` across all v0.x spec revisions — the wire format is backward-compatible within the same protocol version number. A future spec revision that changes the wire format will increment this field.
+
+---
+
 ## 1. Addressing
 
 ### 1.1 Virtual Address Format
