@@ -1,10 +1,28 @@
 # Pilot Protocol Wire Specification v0.5
 
-> **Status:** Active specification
-> **Last reviewed:** 2026-06-18
-> **Companion documents:** [IETF draft-teodor-pilot-protocol-01](https://datatracker.ietf.org/doc/draft-teodor-pilot-protocol/) (protocol), [draft-teodor-pilot-problem-statement-01](https://datatracker.ietf.org/doc/draft-teodor-pilot-problem-statement/) (problem statement)
-> **Reference implementation:** [pilot-protocol/common](https://github.com/pilot-protocol/common) v1.10.x
+# Pilot Protocol Wire Specification v0.5
+
+> **Status:** Active specification  
+> **Specification version:** v0.5  
+> **Protocol version (header):** `1` (4-bit field, see §3.2)  
+> **Last reviewed:** 2026-06-18  
+> **Companion documents:** [IETF draft-teodor-pilot-protocol-01](https://datatracker.ietf.org/doc/draft-teodor-pilot-protocol/) (protocol), [draft-teodor-pilot-problem-statement-01](https://datatracker.ietf.org/doc/draft-teodor-pilot-problem-statement/) (problem statement)  
+> **Reference implementation:** [pilot-protocol/common](https://github.com/pilot-protocol/common) v1.10.x  
 > **Compatibility:** See [SPEC-compat-mode.md](SPEC-compat-mode.md) for WSS/WebSocket transport
+
+## Version Compatibility
+
+| SPEC Version | Protocol version | First Pilot Protocol Release | Status |
+|---|---|---|---|
+| v0.5 | 1 | v1.10.0 | ✅ Active (current) |
+| v0.4 | 1 | v1.7.0 | ⏳ Historical |
+| v0.3 | 1 | v1.5.0 | ⏳ Historical |
+| v0.2 | 1 | v1.4.0 | ⏳ Historical |
+| v0.1 | 1 | v1.0.0 | ⏳ Historical |
+
+> **Note:** The **SPEC version** tracks the wire specification document. The 4-bit **Protocol version** field in the packet header (§3.2) identifies the wire format itself and has remained `1` across all v0.x spec revisions — the wire format is backward-compatible within the same protocol version number. A future spec revision that changes the wire format will increment this field.
+
+---
 
 
 ## 1. Addressing
@@ -76,6 +94,21 @@ Socket address includes a port: `1:0001.F291.0004:1000`
 ---
 
 ## 3. Packet Format
+
+All Pilot Protocol wire-format frames are encapsulated in a tunnel envelope
+identified by a 4-byte magic byte prefix. Four frame types are defined:
+
+| Magic                   | Frame Type                           |
+|-------------------------|--------------------------------------|
+| `PILT` (0x50494C54)    | Unencrypted tunnel frame (plaintext) |
+| `PILS` (0x50494C53)    | AES-256-GCM encrypted tunnel frame   |
+| `PILK` (0x50494C4B)    | X25519 key exchange frame            |
+| `PILA` (0x50494C41)    | Ed25519 + X25519 authenticated key exchange |
+
+The frame types are detailed in §4 below. This section (§3) describes the
+inner 34-byte header shared by PILT (plaintext) frames. Encrypted (PILS),
+key-exchange (PILK), and authenticated (PILA) frames use different header
+layouts documented in §4.
 
 ### 3.1 Header Layout (34 bytes)
 
@@ -397,6 +430,22 @@ Byte  4-7:  0x00000001   (sender node ID=1)
 Byte  8-19: [12-byte nonce]
 Byte 20+:   [ciphertext + 16-byte GCM tag]
 ```
+
+### 7.5 Golden Test Corpus
+
+The wire examples above are illustrative. The authoritative byte-level wire format reference is the **golden test corpus** maintained at [`testdata/wire/`](https://github.com/TeoSlayer/pilotprotocol/tree/main/testdata/wire) in the implementation repository.
+
+This corpus contains byte-for-byte snapshots of every Pilot Protocol wire frame across layers L1, L4, L5, L6, and L7, including packet headers, relay messages, key exchange frames, encrypted payloads, and SACK acknowledgements.
+
+Each `.bin` file is parsed by the live production decoders, re-marshalled, and asserted byte-identical by [`TestWireFormatGolden`](https://github.com/TeoSlayer/pilotprotocol/blob/main/tests/zz_wire_golden_test.go). Any wire-format regression — a field reorder, an extra padding byte, a checksum tweak — fails the test and names the offending frame.
+
+**Regenerating the corpus** is a wire-format change and requires explicit version-bump approval. The generator lives at `cmd/wire-gen/main.go` behind the `wirecorpus` build tag:
+
+```
+go run -tags=wirecorpus ./cmd/wire-gen
+```
+
+See the [`testdata/wire/README.md`](https://github.com/TeoSlayer/pilotprotocol/blob/main/testdata/wire/README.md) for the full frame inventory and regeneration instructions.
 
 ---
 
