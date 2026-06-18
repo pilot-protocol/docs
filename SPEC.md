@@ -1,5 +1,16 @@
 # Pilot Protocol Wire Specification v0.5
 
+## Version Compatibility
+
+The table below maps wire specification versions to corresponding Pilot Protocol software releases. Each spec version is backward-compatible within its minor series.
+
+| SPEC Version | Pilot Protocol Release(s) | Notable Changes |
+|---|---|---|
+| v0.1 – v0.4 | v1.0.0 – v1.3.x | Early spec iterations, pre-extraction. |
+| v0.5 | v1.4.0 – v1.11.x | Current specification. Stable frame format, addressing, tunnel encapsulation, NAT traversal, and all transport layers (native UDP, compat WSS). |
+
+> **Note:** SPEC.md was extracted from the main `pilotprotocol` repository into its own `pilot-protocol/docs` repo. The current software version is determined by `git describe --tags` in the [pilotprotocol](https://github.com/TeoSlayer/pilotprotocol) repository.
+
 ## 1. Addressing
 
 ### 1.1 Virtual Address Format
