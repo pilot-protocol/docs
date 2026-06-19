@@ -1,7 +1,14 @@
 # Pilot Protocol Wire Specification v0.5
 
+# Pilot Protocol Wire Specification v0.5
+
+> **Status:** Active specification  
 > **Specification version:** v0.5  
-> **Protocol version (header):** `1` (4-bit field, see §3.2)
+> **Protocol version (header):** `1` (4-bit field, see §3.2)  
+> **Last reviewed:** 2026-06-18  
+> **Companion documents:** [IETF draft-teodor-pilot-protocol-01](https://datatracker.ietf.org/doc/draft-teodor-pilot-protocol/) (protocol), [draft-teodor-pilot-problem-statement-01](https://datatracker.ietf.org/doc/draft-teodor-pilot-problem-statement/) (problem statement)  
+> **Reference implementation:** [pilot-protocol/common](https://github.com/pilot-protocol/common) v1.10.x  
+> **Compatibility:** See [SPEC-compat-mode.md](SPEC-compat-mode.md) for WSS/WebSocket transport
 
 ## Version Compatibility
 
@@ -16,6 +23,7 @@
 > **Note:** The **SPEC version** tracks the wire specification document. The 4-bit **Protocol version** field in the packet header (§3.2) identifies the wire format itself and has remained `1` across all v0.x spec revisions — the wire format is backward-compatible within the same protocol version number. A future spec revision that changes the wire format will increment this field.
 
 ---
+
 
 ## 1. Addressing
 
@@ -549,3 +557,12 @@ The secure channel on port 443 uses a separate nonce scheme:
 - **Counter**: 8-byte unsigned integer starting at 0, incremented per encryption.
 
 Each secure connection performs its own X25519 key exchange and HKDF-SHA256 key derivation (info: "pilot-secure-v1"), so nonce uniqueness is guaranteed per-key. The sender's nonce prefix (first 4 bytes) is used as GCM AAD on both sides.
+
+---
+
+### References
+
+- **Byte-level specification:** [Golden test corpus](https://github.com/pilot-protocol/common/tree/main/protocol/testdata/wire) — contains canonical wire-format encode/decode test vectors.
+- **IETF drafts:** [draft-teodor-pilot-protocol](https://datatracker.ietf.org/doc/draft-teodor-pilot-protocol/), [draft-teodor-pilot-problem-statement](https://datatracker.ietf.org/doc/draft-teodor-pilot-problem-statement/)
+- **Compatibility:** [SPEC-compat-mode.md](SPEC-compat-mode.md) — WSS/WebSocket transport
+- **Architecture guidance:** See DESIGN.md in each component repository (where available)
