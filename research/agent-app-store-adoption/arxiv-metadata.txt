@@ -1,0 +1,17 @@
+Title:
+The Autonomous Agent App Store: Signed Telemetry, Capability Planning, and Early Adoption in Pilot Protocol
+
+Authors:
+Teodor-Ioan Calin (Pilot Protocol)
+
+Abstract:
+Autonomous agents increasingly require capabilities that are not built into their base runtime: search, browser automation, secure code execution, data stores, payments, market data, and domain-specific APIs. Human app stores solve a related distribution problem, but an agent app store has a different primary consumer: an agent that discovers and provisions typed capabilities for a task. This paper presents an empirical study of the Pilot Protocol app store and its planning front end, Pilot Director, using raw rows from the BigQuery table telemetry.events over a 23-day window from 2026-06-16 through 2026-07-08. The analysis focuses on 268,731 discovery-and-install rows: 150,489 catalogue views, 84,216 app detail views, and 34,026 installs. We describe how Pilot exposes installable capability apps with metadata, manifests, permissions, and typed method schemas; how the protocol supports catalogue discovery, detail inspection, and local provisioning; and how Pilot Director maps natural-language goals onto validated plans over service agents and app-store methods. The aggregate evidence shows substantial early interest in research, execution, database, market, and security capabilities, with a 55.96% detail-to-catalogue volume ratio and a 40.40% install-to-detail volume ratio. We argue that autonomous agent app stores should be evaluated as planner-readable capability markets, not only as human-facing distribution channels.
+
+Comments:
+11 pages, 4 figures, 4 tables.
+
+Primary category:
+cs.MA (Multiagent Systems)
+
+Cross-list:
+cs.SE (Software Engineering)
