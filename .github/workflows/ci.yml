@@ -21,7 +21,7 @@ jobs:
           echo "$(find . -name '*.md' -not -path './.git/*' | wc -l) markdown files"
 
       - name: Lint markdown (advisory)
-        uses: DavidAnson/markdownlint-cli2-action@v16
+        uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
         continue-on-error: true
         with:
           globs: '**/*.md'
